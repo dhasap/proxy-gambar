@@ -9,38 +9,47 @@ export default async function handler(request: Request) {
   const { searchParams } = new URL(request.url);
   const imageUrl = searchParams.get('url');
 
-  // 2. Jika parameter 'url' tidak ada, kirim pesan error
   if (!imageUrl) {
     return new Response('Parameter "url" dibutuhkan.', { status: 400 });
   }
 
+  // Membuat URL referer yang dinamis berdasarkan URL gambar
+  const refererUrl = new URL(imageUrl);
+
+  // *** BAGIAN INI TELAH DIPERBARUI DENGAN PENYAMARAN MAKSIMAL ***
+  // 2. Buat header yang meniru browser Chrome di Android
+  const requestHeaders = new Headers();
+  requestHeaders.set('Accept', 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8');
+  requestHeaders.set('Accept-Encoding', 'gzip, deflate, br');
+  requestHeaders.set('Accept-Language', 'en-US,en;q=0.9,id;q=0.8');
+  requestHeaders.set('Referer', refererUrl.origin + '/'); // Menggunakan domain utama sebagai referer
+  requestHeaders.set('Sec-Ch-Ua', '"Not/A)Brand";v="99", "Google Chrome";v="115", "Chromium";v="115"');
+  requestHeaders.set('Sec-Ch-Ua-Mobile', '?1');
+  requestHeaders.set('Sec-Ch-Ua-Platform', '"Android"');
+  requestHeaders.set('Sec-Fetch-Dest', 'image');
+  requestHeaders.set('Sec-Fetch-Mode', 'no-cors');
+  requestHeaders.set('Sec-Fetch-Site', 'cross-site');
+  requestHeaders.set('User-Agent', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36');
+
+
   try {
-    // 3. Ambil gambar dari URL asli dengan header yang lebih lengkap
+    // 3. Ambil gambar dari URL asli dengan header penyamaran
     const imageResponse = await fetch(imageUrl, {
-      headers: {
-        // *** BAGIAN INI TELAH DIPERBARUI ***
-        // Header ini membuat permintaan kita terlihat seperti dari browser asli
-        'Referer': 'https://komikcast.li/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
-        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9,id;q=0.8',
-      },
+      headers: requestHeaders,
     });
 
-    // 4. Jika server komik merespons dengan error, teruskan errornya
     if (!imageResponse.ok) {
-        // Memberi pesan yang lebih jelas jika gagal
-        return new Response(`Gagal mengambil gambar. Sumber merespons dengan status: ${imageResponse.status}`, { status: imageResponse.status });
+      return new Response(`Gagal mengambil gambar. Sumber merespons dengan status: ${imageResponse.status}`, { status: imageResponse.status });
     }
 
-    // 5. Salin header penting dari respons asli
-    const headers = new Headers();
-    headers.set('Content-Type', imageResponse.headers.get('Content-Type') || 'image/jpeg');
-    headers.set('Cache-Control', 'public, max-age=604800, immutable');
+    // 4. Salin header penting dari respons asli
+    const responseHeaders = new Headers();
+    responseHeaders.set('Content-Type', imageResponse.headers.get('Content-Type') || 'image/jpeg');
+    responseHeaders.set('Cache-Control', 'public, max-age=604800, immutable');
 
-    // 6. Kirim gambar kembali ke browser pengguna
+    // 5. Kirim gambar kembali ke browser pengguna
     return new Response(imageResponse.body, {
-      headers,
+      headers: responseHeaders,
     });
 
   } catch (error) {

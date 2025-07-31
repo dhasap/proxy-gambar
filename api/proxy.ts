@@ -13,46 +13,47 @@ export default async function handler(request: Request) {
     return new Response('Parameter "url" dibutuhkan.', { status: 400 });
   }
 
-  // Membuat URL referer yang dinamis berdasarkan URL gambar
-  const refererUrl = new URL(imageUrl);
-
-  // *** BAGIAN INI TELAH DIPERBARUI DENGAN PENYAMARAN MAKSIMAL ***
-  // 2. Buat header yang meniru browser Chrome di Android
+  // Header penyamaran yang paling penting
   const requestHeaders = new Headers();
-  requestHeaders.set('Accept', 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8');
-  requestHeaders.set('Accept-Encoding', 'gzip, deflate, br');
-  requestHeaders.set('Accept-Language', 'en-US,en;q=0.9,id;q=0.8');
-  requestHeaders.set('Referer', refererUrl.origin + '/'); // Menggunakan domain utama sebagai referer
-  requestHeaders.set('Sec-Ch-Ua', '"Not/A)Brand";v="99", "Google Chrome";v="115", "Chromium";v="115"');
-  requestHeaders.set('Sec-Ch-Ua-Mobile', '?1');
-  requestHeaders.set('Sec-Ch-Ua-Platform', '"Android"');
-  requestHeaders.set('Sec-Fetch-Dest', 'image');
-  requestHeaders.set('Sec-Fetch-Mode', 'no-cors');
-  requestHeaders.set('Sec-Fetch-Site', 'cross-site');
-  requestHeaders.set('User-Agent', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36');
-
+  requestHeaders.set('Referer', 'https://komikcast.li/');
+  requestHeaders.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36');
 
   try {
-    // 3. Ambil gambar dari URL asli dengan header penyamaran
+    // 2. Coba ambil gambar dari URL asli
     const imageResponse = await fetch(imageUrl, {
       headers: requestHeaders,
     });
 
+    // 3. JIKA GAGAL, JALANKAN MODE DETEKTIF
     if (!imageResponse.ok) {
-      return new Response(`Gagal mengambil gambar. Sumber merespons dengan status: ${imageResponse.status}`, { status: imageResponse.status });
+      // Ambil semua header dari respons error untuk dianalisa
+      const errorHeaders = Object.fromEntries(imageResponse.headers.entries());
+      
+      // Buat laporan dalam format JSON
+      const errorReport = {
+        pesan: `Gagal mengambil gambar. Sumber merespons dengan status: ${imageResponse.status}`,
+        url_sumber: imageUrl,
+        laporan_dari_sumber: errorHeaders, // Ini bagian terpenting!
+      };
+      
+      // Tampilkan laporan ini di browser
+      return new Response(JSON.stringify(errorReport, null, 2), {
+        status: imageResponse.status,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    // 4. Salin header penting dari respons asli
+    // 4. JIKA BERHASIL, kirim gambar seperti biasa
     const responseHeaders = new Headers();
     responseHeaders.set('Content-Type', imageResponse.headers.get('Content-Type') || 'image/jpeg');
     responseHeaders.set('Cache-Control', 'public, max-age=604800, immutable');
 
-    // 5. Kirim gambar kembali ke browser pengguna
     return new Response(imageResponse.body, {
       headers: responseHeaders,
     });
 
   } catch (error) {
-    return new Response('Terjadi kesalahan pada server proxy.', { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(JSON.stringify({ message: 'Terjadi kesalahan pada server proxy.', error: errorMessage }), { status: 500 });
   }
 }
